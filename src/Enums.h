@@ -26,4 +26,6 @@ enum PlayerColor {
 
 BoardEntry player_color_to_board_entry(PlayerColor color);
 
+BoardEntry board_entry_from_char(char ch);
+
 #endif

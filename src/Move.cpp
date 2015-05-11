@@ -76,6 +76,8 @@ Move Move::read_from_stream(std::istream& stream)
     } else if(rotate_char == 'L' || rotate_char == 'l') {
         move.m_direction = RotateLeft;
     }
+
+    //Ignore anything after the move up to and including the new line.
     stream.ignore(1000, '\n');
 
     return move;

@@ -69,6 +69,9 @@ WinStatus Board::apply_move(const Move& move, PlayerColor color)
 {
     set_value(move.play_cell(), move.play_index(), player_color_to_board_entry(color));
     WinStatus status = check_for_wins();
+    if(status != NoWin) {
+        return status;
+    }
     rotate_cell(move.rotate_cell(), move.rotation_direction()); 
     return status;
 }
