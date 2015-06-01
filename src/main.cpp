@@ -68,6 +68,7 @@ PlayerController* construct_controller(ControllerType type, std::string name,
         case ControllerTypeComputerMinimax: 
             return new MinimaxComputerController(name, color, initial_board, 3);
         case ControllerTypeComputerMcts: 
+            return new MinimaxComputerController(name, color, initial_board, 2);
             return new MctsComputerController(name, color, initial_board);
         default: throw std::runtime_error("Invalid ControllerType");
     }
@@ -117,7 +118,7 @@ PlayerController* prepare_player(bool ask_color, const std::string& player_ordin
 }
 
 Pentago* start_new_game() {
-    Board board(3, 2);
+    Board board;
     
     PlayerController* player1 = prepare_player(true, "first", board);
     PlayerController* player2 = prepare_player(false, "second", board,

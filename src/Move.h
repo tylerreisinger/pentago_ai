@@ -1,10 +1,10 @@
 #ifndef MOVE_H__
 #define MOVE_H__
 
-#include "Board.h"
-
 #include <ostream>
 #include <istream>
+
+#include "Enums.h"
 
 class Move
 {

@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <algorithm>    
+#include <ctime>
 
 static const float POS_INF = 1e10;
 static const float NEG_INF = -1e10;
@@ -31,6 +32,7 @@ MinimaxComputerController::~MinimaxComputerController() {
 
 Move MinimaxComputerController::make_move(const Board& board, const Pentago& game) {
     
+    clock_t start_time = std::clock();
     m_node_evals = 0;
     std::cout << "score = " << score_board(board) << std::endl;
 
@@ -47,6 +49,12 @@ Move MinimaxComputerController::make_move(const Board& board, const Pentago& gam
 
     std::cout << "end score = " << score_board(board_copy) << std::endl;
     std::cout << "node evals = " << m_node_evals << std::endl;
+
+    clock_t end_time = std::clock();
+
+    double elapsed_s = static_cast<double>(end_time - start_time) / CLOCKS_PER_SEC;
+
+    std::cout << "Move time: " << elapsed_s << " seconds" << std::endl;
 
     return move; 
 }
@@ -209,11 +217,9 @@ int vert_scan(const Board& board, int x, int y, BoardEntry entry) {
 int diag_scan(const Board& board, int x, int y, BoardEntry entry) {
     int run_len = 0;
 
-    for(int off = 1; off < 5; ++off) {
-        if(x+off >= board.board_size() || y+off >= board.board_size()) {
-            break;
-        }
-
+    int max_run = board.board_size() - std::max(x, y);
+    max_run = std::min(max_run, 5);
+    for(int off = 1; off < max_run; ++off) {
         BoardEntry scan_entry = board.get_value_absolute(x+off, y+off);
 
         if(!scan_compare(entry, scan_entry, run_len)) {

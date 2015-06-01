@@ -4,6 +4,7 @@
 #include <string>
 
 #include "Move.h"
+#include "Board.h"
 
 #include "Enums.h"
 

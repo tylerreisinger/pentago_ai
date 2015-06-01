@@ -140,7 +140,7 @@ Pentago* Pentago::load_game(std::istream& in_stream)
     //Ignore all characters up to the new line so getline starts with the board data.
     in_stream.ignore(1000, '\n');
 
-    Board board(3, 2);
+    Board board;
 
     //Read in the board state
     for(int i = 0; i < board.board_size(); ++i) {

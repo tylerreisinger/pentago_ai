@@ -3,21 +3,25 @@
 
 #include <vector>
 #include <ostream>
+#include <array>
 
 #include "Enums.h"
-
-class Move;
+#include "Move.h"
 
 //Object representing the state of a pentago board.
 class Board
 {
 public:
     static const int WIN_SIZE = 5;
+    static const int CELL_SIZE = 3;
+    static const int CELLS_PER_ROW = 2;
+    static const int TOTAL_ENTRIES = CELL_SIZE*CELL_SIZE*CELLS_PER_ROW*CELLS_PER_ROW;
+    static const int CELL_ENTRIES = CELL_SIZE*CELL_SIZE;
 
     //Construct a board with the given dimensions.
     //Board(3, 2) is the standard 6x6 board.
-    Board(int cell_size, int cells_per_row);
-    ~Board();
+    Board();
+    ~Board() {};
 
     Board(const Board& other);
 
@@ -45,12 +49,12 @@ public:
     void apply_move_no_check(const Move& move, PlayerColor color);
 
     //Return board dimensions
-    int board_size() const {return m_cell_size*m_cells_per_row;}
-    int cells_per_row() const {return m_cells_per_row;}
-    int cell_size() const {return m_cell_size;}
-    int entries_per_cell() const {return m_cell_size*m_cell_size;}
-    int cell_count() const {return m_cells_per_row*m_cells_per_row;}
-    int total_entries() const {return m_cell_size*m_cell_size*m_cells_per_row*m_cells_per_row;}
+    int board_size() const {return CELL_SIZE*CELLS_PER_ROW;}
+    int cells_per_row() const {return CELLS_PER_ROW;}
+    int cell_size() const {return CELL_SIZE;}
+    int entries_per_cell() const {return CELL_SIZE*CELL_SIZE;}
+    int cell_count() const {return CELLS_PER_ROW*CELLS_PER_ROW;}
+    int total_entries() const {return TOTAL_ENTRIES;}
 
     void cell_to_absolute_pos(int cell, int entry, int& x, int& y) const;
 
@@ -64,9 +68,7 @@ public:
 
 protected:
 
-    int m_cell_size;
-    int m_cells_per_row;
-    std::vector<BoardEntry> m_board;
+    std::array<BoardEntry, TOTAL_ENTRIES> m_board;
 private:
 
     void rotate_cell_left(int cell);
@@ -77,6 +79,8 @@ private:
 
 std::ostream& operator <<(std::ostream& stream, BoardEntry entry);
 std::ostream& operator <<(std::ostream& stream, WinStatus value);
+
+//Functions inlined for considerable performance improvement
 
 inline BoardEntry& Board::get_value(int cell, int entry)
 {
@@ -116,7 +120,39 @@ inline bool Board::is_cell_empty_absolute(int x, int y) const
 {
     return get_value_absolute(x, y) == EmptyEntry; 
 }
+
+inline Board::Board() { 
+    m_board.fill(EmptyEntry); 
+}
  
+inline Board::Board(const Board& other):
+    m_board(other.m_board)
+{ 
+}
+ 
+inline Board Board::clone() const
+{
+    return Board(*this);  
+}
+ 
+inline void Board::apply_move_no_check(const Move& move, PlayerColor color)
+{
+    set_value(move.play_cell(), move.play_index(), player_color_to_board_entry(color));
+    rotate_cell(move.rotate_cell(), move.rotation_direction()); 
+}
+ 
+inline void Board::cell_to_absolute_pos(int cell, int entry, int& x, int& y) const
+{
+    int cell_start_x = (cell % cells_per_row()) * cell_size();
+    int cell_start_y = (cell / cells_per_row()) * cell_size();
+
+    int cell_offset_x = entry % cell_size();
+    int cell_offset_y = entry / cell_size();
+
+    x = cell_start_x + cell_offset_x;
+    y = cell_start_y + cell_offset_y;
+ 
+}
 
 #endif
     

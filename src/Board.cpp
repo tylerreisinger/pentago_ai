@@ -2,8 +2,6 @@
 
 #include <cassert>
 
-#include "Move.h"
-
 RotationDirection reverse_direction(RotationDirection direction) {
     if(direction == RotateLeft) {
         return RotateRight;
@@ -12,28 +10,6 @@ RotationDirection reverse_direction(RotationDirection direction) {
     }
 }
 
-Board::Board(int cell_size, int cells_per_row):
-    m_cell_size(cell_size), m_cells_per_row(cells_per_row), m_board((cell_size*cells_per_row)*(cell_size*cells_per_row))
-{
- 
-}
- 
-Board::~Board()
-{
- 
-}
- 
-Board::Board(const Board& other):
-    m_cell_size(other.m_cell_size), m_cells_per_row(other.m_cells_per_row),
-    m_board(other.m_board)
-{ 
-}
- 
-Board Board::clone() const
-{
-    return Board(*this);  
-}
- 
 void Board::set_value(int cell, int entry, BoardEntry value)
 {
     int x;
@@ -73,59 +49,38 @@ WinStatus Board::apply_move(const Move& move, PlayerColor color)
     return end_status;
 }
  
-void Board::apply_move_no_check(const Move& move, PlayerColor color)
-{
-    set_value(move.play_cell(), move.play_index(), player_color_to_board_entry(color));
-    rotate_cell(move.rotate_cell(), move.rotation_direction()); 
-}
- 
-void Board::cell_to_absolute_pos(int cell, int entry, int& x, int& y) const
-{
-    assert(cell >= 0 && cell < m_cells_per_row*m_cells_per_row);
-    assert(entry >= 0 && entry < m_cell_size*m_cell_size);
-
-    int cell_start_x = (cell % m_cells_per_row) * m_cell_size;
-    int cell_start_y = (cell / m_cells_per_row) * m_cell_size;
-
-    int cell_offset_x = entry % m_cell_size;
-    int cell_offset_y = entry / m_cell_size;
-
-    x = cell_start_x + cell_offset_x;
-    y = cell_start_y + cell_offset_y;
- 
-}
  
 void Board::rotate_cell(int cell, RotationDirection dir)
 {
-    std::vector<BoardEntry> cell_copy(m_cell_size*m_cell_size);
+    std::array<BoardEntry, CELL_ENTRIES> cell_copy;
 
     int cell_start_x;
     int cell_start_y;
 
     cell_to_absolute_pos(cell, 0, cell_start_x, cell_start_y);
 
-    for(int y = 0; y < m_cell_size; ++y) {
+    for(int y = 0; y < cell_size(); ++y) {
         int y_pos = y + cell_start_y;
-        for(int x = 0; x < m_cell_size; ++x) {
+        for(int x = 0; x < cell_size(); ++x) {
            int x_pos = x + cell_start_x;
             
-           cell_copy[x + y*m_cell_size] = m_board[x_pos + y_pos*board_size()];
+           cell_copy[x + y*cell_size()] = m_board[x_pos + y_pos*board_size()];
         }
     } 
 
-    for(int y = 0; y < m_cell_size; ++y) {
+    for(int y = 0; y < cell_size(); ++y) {
 
-        for(int x = 0; x < m_cell_size; ++x) {
+        for(int x = 0; x < cell_size(); ++x) {
 
            int rotated_x;
            int rotated_y;
             
            if(dir == RotateLeft) {
-               rotated_y = (m_cell_size-1)-x;
+               rotated_y = (cell_size()-1)-x;
                rotated_x = y;
            } else if (dir == RotateRight) {
                rotated_y = x;
-               rotated_x = (m_cell_size-1)-y;
+               rotated_x = (cell_size()-1)-y;
            } else {
                assert(false);
                return;
@@ -133,7 +88,7 @@ void Board::rotate_cell(int cell, RotationDirection dir)
 
            int x_pos_rotated = rotated_x + cell_start_x;
            int y_pos_rotated = rotated_y + cell_start_y;
-           m_board[x_pos_rotated + y_pos_rotated*board_size()] = cell_copy[x + y*m_cell_size];
+           m_board[x_pos_rotated + y_pos_rotated*board_size()] = cell_copy[x + y*cell_size()];
         }
     } 
 }
