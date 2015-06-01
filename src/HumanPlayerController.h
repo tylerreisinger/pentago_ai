@@ -3,6 +3,8 @@
 
 #include "PlayerController.h"
 
+//A PlayerController allowing a human player to control the moves through 
+//the terminal.
 class HumanPlayerController: public PlayerController
 {
 public:

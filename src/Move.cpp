@@ -7,17 +7,6 @@ Move::Move(int cell, int index, int rotate_cell, RotationDirection dir):
 {
 }
 
-Move::~Move()
-{
- 
-}
-
-Move::Move(const Move& other):
-    m_cell(other.m_cell), m_index(other.m_index), m_rotate_cell(other.m_rotate_cell),
-    m_direction(other.m_direction)
-{
-}
-
 std::ostream& operator <<(std::ostream& stream, const Move& move) {
     
     stream << move.play_cell()+1 << "/" << move.play_index()+1 << " ";
@@ -34,6 +23,7 @@ std::ostream& operator <<(std::ostream& stream, const Move& move) {
     return stream;
 }
 
+ 
 Move Move::read_from_stream(std::istream& stream)
 {
     Move move; 
@@ -81,5 +71,10 @@ Move Move::read_from_stream(std::istream& stream)
     stream.ignore(1000, '\n');
 
     return move;
+}
+ 
+Move Move::invalid_move()
+{
+    return Move(-1, -1, -1, RotateRight);
 }
  

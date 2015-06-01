@@ -25,3 +25,12 @@ BoardEntry board_entry_from_char(char ch)
     }
 }
  
+PlayerColor opposing_color(PlayerColor color)
+{
+    if(color == WhitePlayer) {
+       return BlackPlayer;
+    } else {
+       return WhitePlayer;
+    } 
+}
+ 

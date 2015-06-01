@@ -28,4 +28,7 @@ BoardEntry player_color_to_board_entry(PlayerColor color);
 
 BoardEntry board_entry_from_char(char ch);
 
+//Return the color of the opponent, if the player's color is color.
+PlayerColor opposing_color(PlayerColor color);
+
 #endif

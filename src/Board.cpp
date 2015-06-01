@@ -4,6 +4,14 @@
 
 #include "Move.h"
 
+RotationDirection reverse_direction(RotationDirection direction) {
+    if(direction == RotateLeft) {
+        return RotateRight;
+    } else {
+        return RotateLeft;
+    }
+}
+
 Board::Board(int cell_size, int cells_per_row):
     m_cell_size(cell_size), m_cells_per_row(cells_per_row), m_board((cell_size*cells_per_row)*(cell_size*cells_per_row))
 {
@@ -21,33 +29,9 @@ Board::Board(const Board& other):
 { 
 }
  
-BoardEntry& Board::get_value(int cell, int entry)
+Board Board::clone() const
 {
-    int x;
-    int y;
-    cell_to_absolute_pos(cell, entry, x, y);
-
-    return m_board[x + y * board_size()];
-
-}
- 
-BoardEntry Board::get_value(int cell, int entry) const
-{
-    int x;
-    int y;
-    cell_to_absolute_pos(cell, entry, x, y);
-
-    return m_board[x + y * board_size()];
-}
- 
-BoardEntry& Board::get_value_absolute(int x, int y)
-{
-    return m_board[x + y*board_size()]; 
-}
- 
-BoardEntry Board::get_value_absolute(int x, int y) const
-{
-    return m_board[x + y*board_size()]; 
+    return Board(*this);  
 }
  
 void Board::set_value(int cell, int entry, BoardEntry value)
@@ -68,17 +52,31 @@ void Board::set_value_absolute(int x, int y, BoardEntry value)
 WinStatus Board::apply_move(const Move& move, PlayerColor color)
 {
     set_value(move.play_cell(), move.play_index(), player_color_to_board_entry(color));
+    bool no_twist_win = false;
+
     WinStatus status = check_for_wins();
     if(status != NoWin) {
-        return status;
+        no_twist_win = true;
     }
     rotate_cell(move.rotate_cell(), move.rotation_direction()); 
-    return status;
+    WinStatus end_status = check_for_wins();
+    if(no_twist_win) {
+        if(check_for_wins() == Tie) {
+            return Tie;
+        }
+        else {
+            rotate_cell(move.rotate_cell(),
+                   reverse_direction(move.rotation_direction()));
+            return status;
+        }
+    }
+    return end_status;
 }
  
-int Board::board_size() const
+void Board::apply_move_no_check(const Move& move, PlayerColor color)
 {
-    return m_cells_per_row*m_cell_size; 
+    set_value(move.play_cell(), move.play_index(), player_color_to_board_entry(color));
+    rotate_cell(move.rotate_cell(), move.rotation_direction()); 
 }
  
 void Board::cell_to_absolute_pos(int cell, int entry, int& x, int& y) const
@@ -197,6 +195,18 @@ WinStatus Board::check_for_wins() const
     }
 }
 
+bool Board::check_full() const
+{
+    for(int i = 0; i < board_size(); ++i) {
+        for(int j = 0; j < board_size(); ++j) {
+            if(get_value_absolute(i, j) == EmptyEntry) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+ 
 void Board::check_run_next(int x, int y, int& run_len, BoardEntry& run_type,
         bool& white_win, bool& black_win) const
 {

@@ -50,7 +50,12 @@ WinStatus Pentago::play_game()
             return pre_twist_win;
         }
 
+        if(m_board.check_full()) {
+            return NoWin;
+        }
+
         std::cout << m_board << std::endl;
+
 
         //Swap the players and store the move in the history.
         std::swap(m_current_player, m_next_player);
@@ -162,6 +167,11 @@ Pentago* Pentago::load_game(std::istream& in_stream)
     }
     
     return game;
+}
+ 
+PlayerController* Pentago::get_player_from_color(PlayerColor color)
+{
+    return m_current_player->color() == color ? m_current_player : m_next_player;
 }
  
 void Pentago::save_state()

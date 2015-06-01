@@ -26,6 +26,10 @@ public:
 
     static Pentago* load_game(std::istream& in_stream);
 
+    PlayerController* get_current_player() {return m_current_player;}
+    PlayerController* get_next_player() {return m_next_player;}
+    PlayerController* get_player_from_color(PlayerColor color);
+
 protected:
     Board m_board;
 
