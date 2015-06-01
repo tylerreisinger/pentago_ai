@@ -1,6 +1,8 @@
 #ifndef MINIMAXCOMPUTERCONTROLLER_H__
 #define MINIMAXCOMPUTERCONTROLLER_H__
 
+#define DIAGNOSTICS 1
+
 
 #include "PlayerController.h"
 

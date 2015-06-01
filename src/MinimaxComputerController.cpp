@@ -4,6 +4,7 @@
 #include <iostream>
 #include <algorithm>    
 #include <ctime>
+#include <cassert>
 
 static const float POS_INF = 1e10;
 static const float NEG_INF = -1e10;
@@ -36,6 +37,7 @@ Move MinimaxComputerController::make_move(const Board& board, const Pentago& gam
     m_node_evals = 0;
     std::cout << "score = " << score_board(board) << std::endl;
 
+    //Remove all killer moves from the last turn.
     std::fill(m_killer_moves.begin(), m_killer_moves.end(), Move::invalid_move());
     build_static_move_list(board);
 
@@ -60,11 +62,15 @@ Move MinimaxComputerController::make_move(const Board& board, const Pentago& gam
 }
 
  
+//Create a semi-random list of all valid moves given board. Only the play positions
+//are randomized, all 8 rotations for each move are together to allow for skipping
+//8 moves ahead any time a non-empty entry is found by minimax.
 void MinimaxComputerController::build_static_move_list(const Board& board)
 {
     const int MOVES_PER_ENTRY = board.cell_count()*2;
 
     int move_count = 0;
+    //Shuffle the locations
     for(int cell = 0; cell < board.cell_count(); ++cell) {
         for(int entry = 0; entry < board.entries_per_cell(); ++entry) {
             if(board.is_cell_empty(cell, entry)) {
@@ -80,7 +86,11 @@ void MinimaxComputerController::build_static_move_list(const Board& board)
     m_potential_moves.clear();
     m_potential_moves.reserve(move_count*board.cell_count()*2+KILLER_COUNT);
 
-    for(int i = KILLER_COUNT; i < move_count+KILLER_COUNT; ++i) {
+    //Killer move slot
+    m_potential_moves.push_back(Move::invalid_move());
+
+    //Build the actual moves from the locations
+    for(int i = 0; i < move_count; ++i) {
         for(int rot_cell = 0; rot_cell < board.cell_count(); ++rot_cell) {
             m_potential_moves.push_back(Move(m_move_loc_list[i].play_cell(),
                     m_move_loc_list[i].play_index(), rot_cell, RotateLeft));
@@ -90,6 +100,8 @@ void MinimaxComputerController::build_static_move_list(const Board& board)
     }
 }
  
+//Return a score for the given board. A positive score represents a "good" situation
+//and a negative one represents a good situation for the opponent.
 float MinimaxComputerController::score_board(const Board& board)
 {
     float player_score = 0.0;
@@ -111,6 +123,7 @@ float MinimaxComputerController::score_board(const Board& board)
     return player_score - opponent_score;
 }
 
+//Scan for the top 3 runs of each player. This contains most of minimax's runtime.
 void MinimaxComputerController::find_runs(const Board& board,
         std::array<int, BEST_RUN_COUNT>& player_runs,
         std::array<int, BEST_RUN_COUNT>& opponent_runs) {
@@ -149,6 +162,7 @@ void MinimaxComputerController::find_runs(const Board& board,
     }
 }
 
+//Maintain the list of top 3 runs
 void insert_shift_down(int val, std::array<int, 3>& array) {
     if(val > array[0]) {
         array[2] = array[1];
@@ -179,6 +193,8 @@ void MinimaxComputerController::add_run(
     }
 }
 
+//Scannin helper functions. Easily inlined (mostly), these are a trade off between
+//readable/changable and fast code.
 
 int horiz_scan(const Board& board, int x, int y, BoardEntry entry) {
     int run_len = 0;
@@ -189,6 +205,9 @@ int horiz_scan(const Board& board, int x, int y, BoardEntry entry) {
         if(!scan_compare(entry, scan_entry, run_len)) {
             break;
         }
+
+        //Cutoff at the edges. Removing this decreases the goodness of the ai vs
+        //the original, for reasons I don't fully know.
         if(x2-x >= 4) {
             break;
         }
@@ -229,7 +248,6 @@ int diag_scan(const Board& board, int x, int y, BoardEntry entry) {
     return run_len;
 }
 
-
 bool scan_compare(BoardEntry entry, BoardEntry scan_entry, int& run_len) {
     if(scan_entry == EmptyEntry) {
         return true; 
@@ -241,6 +259,9 @@ bool scan_compare(BoardEntry entry, BoardEntry scan_entry, int& run_len) {
     }     
 }
 
+//In general, center tiles are better than edge tiles (confirmed by a monte-carlo
+//tree search approach to the problem), so we give them a small positive score.
+//Really only affects the early game much.
 void MinimaxComputerController::center_control_scores(const Board& board,
         float& player_score, float& opponent_score)
 {
@@ -261,6 +282,9 @@ void MinimaxComputerController::center_control_scores(const Board& board,
     opponent_score *= m_coeff_center_control;
 }
  
+//Score runs. The top three are considered, with decreasing significants as you go down.
+//Scores for length are the length - 1 squared. This makes the ai more aggressively block
+//near wins.
 float MinimaxComputerController::run_score(const std::array<int, BEST_RUN_COUNT>& runs)
 {
 
@@ -277,6 +301,7 @@ float MinimaxComputerController::run_score(const std::array<int, BEST_RUN_COUNT>
     return score; 
 }
  
+
 void MinimaxComputerController::run_scores(const Board& board,
        float& player_score, float& opponent_score)
 {
@@ -291,12 +316,14 @@ void MinimaxComputerController::run_scores(const Board& board,
     player_score = run_score(player_runs);
     opponent_score = run_score(opponent_runs);
 }
- 
+
+//Minimax entry. Returns a chosen move.
 Move MinimaxComputerController::minimax_2(const Board& board, int depth_bound, float& value)
 {
     return minimax_max_value(board, depth_bound, NEG_INF*10, POS_INF*10, value); 
 }
  
+//Minimax function for max levels of the tree. Adapted from the text book description.
 Move MinimaxComputerController::minimax_max_value(const Board& board, int depth_bound,
         float alpha, float beta, float& value)
 {
@@ -319,7 +346,7 @@ Move MinimaxComputerController::minimax_max_value(const Board& board, int depth_
         i = 1;
     }
 
-    for(int i = 0; i < m_potential_moves.size(); ++i) {
+    for(; i < m_potential_moves.size(); ++i) {
         Move player_move = m_potential_moves[i];
         if(!board.is_cell_empty(player_move.play_cell(), player_move.play_index())) {
             i += 7;
@@ -353,6 +380,7 @@ Move MinimaxComputerController::minimax_max_value(const Board& board, int depth_
     return move;
 }
  
+//Minimax function for min levels of the tree. Adapted from the text book description.
 Move MinimaxComputerController::minimax_min_value(const Board& board, int depth_bound,
         float alpha, float beta, float& value)
 {

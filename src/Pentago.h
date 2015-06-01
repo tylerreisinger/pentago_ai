@@ -24,6 +24,8 @@ public:
 
     void set_save_file(std::string file_name) {m_save_state_file_name = file_name;}
 
+    void swap_payers();
+
     static Pentago* load_game(std::istream& in_stream);
 
     PlayerController* get_current_player() {return m_current_player;}
@@ -48,5 +50,10 @@ private:
 };
 
 
+inline void Pentago::swap_payers()
+{
+    std::swap(m_current_player, m_next_player); 
+}
+ 
 #endif
     
