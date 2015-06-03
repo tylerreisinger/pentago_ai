@@ -4,14 +4,16 @@
 #include "Pentago.h"
 
 #include "MinimaxComputerController.h"
+#include "MctsComputerController.h"
 
 float arena(int argc, char** argv, int max_runs);
 
 Pentago* initialize_game(int argc, char** argv) {
     Board board;
 
-    PlayerController* p1 = new MinimaxComputerController("p1", WhitePlayer, board, 2);
-    PlayerController* p2 = new MinimaxComputerController("p2", BlackPlayer, board, 2);
+    PlayerController* p1 = new MinimaxComputerController("p1", WhitePlayer, board, 2, 15.00);
+   //PlayerController* p2 = new MinimaxComputerController("p2", BlackPlayer, board, 2, 15.00);
+   PlayerController* p2 = new MctsComputerController("p2", BlackPlayer, board);
 
     Pentago* game = new Pentago(board, p1, p2);
     return game;

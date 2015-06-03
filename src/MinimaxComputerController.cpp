@@ -1,7 +1,7 @@
 #include "MinimaxComputerController.h"
 
 #include <cstdlib>
-#include <iostream>
+#include <iostream> 
 #include <algorithm>    
 #include <ctime>
 #include <cassert>
@@ -14,17 +14,19 @@ bool scan_compare(BoardEntry entry, BoardEntry scan_entry, int& run_len);
 int horiz_scan(const Board& board, int x, int y, BoardEntry entry);
 int vert_scan(const Board& board, int x, int y, BoardEntry entry);
 int diag_scan(const Board& board, int x, int y, BoardEntry entry);
+int diag_scan_neg(const Board& board, int x, int y, BoardEntry entry);
 
 MinimaxComputerController::MinimaxComputerController(std::string name, PlayerColor color,
-        const Board& board, int depth):
-    PlayerController(name, color), m_depth(depth) {
+        const Board& board, int start_depth, float max_turn_time):
+    PlayerController(name, color), m_start_depth(start_depth),
+    m_max_turn_time(max_turn_time)
+{
 
-    m_coeff_center_control = 0.25;
+    m_coeff_center_control = 2.50;
     m_coeff_longest_run = 1.00;
 
     m_move_loc_list.resize(board.total_entries(), Move::invalid_move());
     build_static_move_list(board);
-    m_killer_moves.resize(depth+1, Move::invalid_move());
 }
 
 MinimaxComputerController::~MinimaxComputerController() {
@@ -33,18 +35,52 @@ MinimaxComputerController::~MinimaxComputerController() {
 
 Move MinimaxComputerController::make_move(const Board& board, const Pentago& game) {
     
-    clock_t start_time = std::clock();
+    m_time_cancel = false;
+    m_search_start_time = std::clock();
     m_node_evals = 0;
     std::cout << "score = " << score_board(board) << std::endl;
 
-    //Remove all killer moves from the last turn.
-    std::fill(m_killer_moves.begin(), m_killer_moves.end(), Move::invalid_move());
     build_static_move_list(board);
 
-    float max;
-    Move move = minimax_2(board, m_depth, max);
+    float max = 0.0;
+    float old_max = 0.0;
+
+    int depth = 0;
+
+    clock_t elapsed_time = std::clock() - m_search_start_time;
+
+    Move move = Move::invalid_move();
+
+    //Apply iterative deepening. This not only allows the highest depth for the
+    //time constrait to be chosen, but guarentees that the quickest win will be
+    //selected.
+    while(elapsed_time <= m_max_turn_time*CLOCKS_PER_SEC && depth < 4) {
+        m_killer_moves.resize(depth+1, Move::invalid_move());
+        Move new_move = minimax_2(board, depth, max);
+        if(!m_time_cancel) {
+            move = new_move;
+            depth += 1;
+        } else {
+            max = old_max;
+            break;
+        }
+        
+        //Check if we have a winning move. We should't need to go deeper if we do.
+        Board board_copy = board.clone();
+
+        WinStatus early_win = board_copy.apply_move(new_move, color());
+        WinStatus late_win = board_copy.check_for_wins();
+
+        if(early_win == player_win_kind() || late_win == player_win_kind()) {
+            break;
+        }
+
+        elapsed_time = std::clock() - m_search_start_time;
+        std::swap(old_max, max);
+    }
 
     std::cout << "max = " << max << std::endl;
+    std::cout << "depth = " << depth << std::endl;
 
     Board board_copy = board.clone();
     board_copy.apply_move_no_check(move, color());
@@ -54,7 +90,7 @@ Move MinimaxComputerController::make_move(const Board& board, const Pentago& gam
 
     clock_t end_time = std::clock();
 
-    double elapsed_s = static_cast<double>(end_time - start_time) / CLOCKS_PER_SEC;
+    double elapsed_s = static_cast<double>(end_time - m_search_start_time) / CLOCKS_PER_SEC;
 
     std::cout << "Move time: " << elapsed_s << " seconds" << std::endl;
 
@@ -73,15 +109,11 @@ void MinimaxComputerController::build_static_move_list(const Board& board)
     //Shuffle the locations
     for(int cell = 0; cell < board.cell_count(); ++cell) {
         for(int entry = 0; entry < board.entries_per_cell(); ++entry) {
-            if(board.is_cell_empty(cell, entry)) {
-                m_move_loc_list[move_count] = Move(cell, entry, 1,  RotateRight);
-                move_count += 1;
-            }
+            m_move_loc_list[move_count] = Move(cell, entry, 1,  RotateRight);
+            move_count += 1;
         }
     }
-
     std::random_shuffle(m_move_loc_list.begin(), m_move_loc_list.begin()+move_count);
-    
 
     m_potential_moves.clear();
     m_potential_moves.reserve(move_count*board.cell_count()*2+KILLER_COUNT);
@@ -160,6 +192,17 @@ void MinimaxComputerController::find_runs(const Board& board,
             }
         }        
     }
+
+    for(int y = 1; y < board.board_size(); ++y) {
+        for(int x = 0; x < board.board_size()-1; ++x) {
+            BoardEntry entry = board.get_value_absolute(x, y);
+
+            if(entry != EmptyEntry) {
+                int run_len = diag_scan_neg(board, x, y, entry);
+                add_run(player_runs, opponent_runs, run_len, entry);    
+            }
+        }        
+    }
 }
 
 //Maintain the list of top 3 runs
@@ -193,7 +236,7 @@ void MinimaxComputerController::add_run(
     }
 }
 
-//Scannin helper functions. Easily inlined (mostly), these are a trade off between
+//Scanning helper functions. Easily inlined (mostly), these are a trade off between
 //readable/changable and fast code.
 
 int horiz_scan(const Board& board, int x, int y, BoardEntry entry) {
@@ -206,8 +249,6 @@ int horiz_scan(const Board& board, int x, int y, BoardEntry entry) {
             break;
         }
 
-        //Cutoff at the edges. Removing this decreases the goodness of the ai vs
-        //the original, for reasons I don't fully know.
         if(x2-x >= 4) {
             break;
         }
@@ -247,6 +288,22 @@ int diag_scan(const Board& board, int x, int y, BoardEntry entry) {
     }
     return run_len;
 }
+
+int diag_scan_neg(const Board& board, int x, int y, BoardEntry entry) {
+    int run_len = 0;
+
+    int max_run = std::max(board.board_size() - x, y);
+    max_run = std::min(max_run, 5);
+    for(int off = 1; off < max_run; ++off) {
+        BoardEntry scan_entry = board.get_value_absolute(x+off, y-off);
+
+        if(!scan_compare(entry, scan_entry, run_len)) {
+            break;
+        }
+    }
+    return run_len;
+}
+
 
 bool scan_compare(BoardEntry entry, BoardEntry scan_entry, int& run_len) {
     if(scan_entry == EmptyEntry) {
@@ -289,7 +346,7 @@ float MinimaxComputerController::run_score(const std::array<int, BEST_RUN_COUNT>
 {
 
     float score = 0.0;
-    if(runs[0] == Board::WIN_SIZE-1) {
+    if(runs[0] >= Board::WIN_SIZE-1) {
         return POS_INF;
     }
 
@@ -327,12 +384,18 @@ Move MinimaxComputerController::minimax_2(const Board& board, int depth_bound, f
 Move MinimaxComputerController::minimax_max_value(const Board& board, int depth_bound,
         float alpha, float beta, float& value)
 {
+    if(std::clock() - m_search_start_time >= CLOCKS_PER_SEC*m_max_turn_time) {
+        m_time_cancel = true;
+        return Move::invalid_move();
+    }
+
     m_node_evals += 1;
     float board_score = score_board(board);
     if(board_score > 1000.0 || board_score < -1000.0) {
         value = board_score;
         return Move::invalid_move();
     }    
+
     value = NEG_INF*10;
     Move move = Move::invalid_move();
     
@@ -356,7 +419,7 @@ Move MinimaxComputerController::minimax_max_value(const Board& board, int depth_
         Board new_state = board.clone();
         new_state.apply_move_no_check(player_move, color());
         
-        float inner_value;
+        float inner_value = 0.0;
 
         if(depth_bound > 0) { 
             Move m = minimax_min_value(new_state, depth_bound-1,
@@ -368,6 +431,12 @@ Move MinimaxComputerController::minimax_max_value(const Board& board, int depth_
         if (inner_value > value) {
             value = inner_value;
             move = player_move;
+            //We found a win. Nothing will score less than it, so searching onward
+            //is a waste of time.
+            
+            if(value > 10000) {
+                return move;
+            }
         }
 
         if(value > beta) {
@@ -384,6 +453,11 @@ Move MinimaxComputerController::minimax_max_value(const Board& board, int depth_
 Move MinimaxComputerController::minimax_min_value(const Board& board, int depth_bound,
         float alpha, float beta, float& value)
 {
+    if(std::clock() - m_search_start_time >= CLOCKS_PER_SEC*m_max_turn_time) {
+        m_time_cancel = true;
+        return Move::invalid_move();
+    }
+
     m_node_evals += 1;
     float board_score = score_board(board);
 
@@ -415,7 +489,7 @@ Move MinimaxComputerController::minimax_min_value(const Board& board, int depth_
         Board new_state = board.clone();
         new_state.apply_move_no_check(player_move, opposing_color(color())); 
 
-        float inner_value;
+        float inner_value = 0.0;
 
         if(depth_bound > 0) {
             minimax_max_value(new_state, depth_bound-1, alpha, beta, inner_value);
@@ -423,9 +497,15 @@ Move MinimaxComputerController::minimax_min_value(const Board& board, int depth_
             inner_value = score_board(new_state);
         }
 
-        if(value > inner_value) {
+        if(inner_value < value) {
             value = inner_value;
             move = player_move;
+
+            //We found a loss. Nothing will score less than it, so searching onward
+            //is a waste of time.
+            if(value < -100000) {
+                return move;
+            }
         }
 
         if(value < alpha) {

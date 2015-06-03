@@ -66,9 +66,8 @@ PlayerController* construct_controller(ControllerType type, std::string name,
         case ControllerTypeComputerRandom: 
             return new RandomComputerController(name, color);
         case ControllerTypeComputerMinimax: 
-            return new MinimaxComputerController(name, color, initial_board, 3);
+            return new MinimaxComputerController(name, color, initial_board, 2, 15.00);
         case ControllerTypeComputerMcts: 
-            return new MinimaxComputerController(name, color, initial_board, 2);
             return new MctsComputerController(name, color, initial_board);
         default: throw std::runtime_error("Invalid ControllerType");
     }

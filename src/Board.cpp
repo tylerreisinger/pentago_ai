@@ -121,6 +121,28 @@ WinStatus Board::check_for_wins() const
         }
     }
 
+    for(int y = 0; y < board_size(); ++y) {
+        for(int x = 0; x < board_size()-WIN_SIZE+1; ++x) {
+            run_len = 0;
+            run_type = EmptyEntry;
+            for(int off = 0; off < board_size()-x; ++off) {
+                check_run_next(x+off, y+off, run_len, run_type, white_win, black_win);
+            } 
+        }
+    }
+
+    for(int y = board_size()-2; y < board_size(); ++y) {
+        for(int x = 0; x < board_size()-WIN_SIZE+1; ++x) {
+            run_len = 0;
+            run_type = EmptyEntry;
+            for(int off = 0; off < board_size()-x; ++off) {
+                check_run_next(x+off, y-off, run_len, run_type, white_win, black_win);
+            } 
+        }
+    }
+
+
+    /*
     //Look for x diagonal wins
     for(int x = 0; x < board_size()-WIN_SIZE+1; ++x) {
         run_len = 0;
@@ -138,6 +160,7 @@ WinStatus Board::check_for_wins() const
             check_run_next(off, y+off, run_len, run_type, white_win, black_win);
         } 
     }
+    */
 
     if(white_win && !black_win) {
         return WhiteWin;

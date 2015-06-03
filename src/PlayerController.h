@@ -19,6 +19,7 @@ public:
 
     const std::string& name() const {return m_name;}
     PlayerColor color() const {return m_color;}
+    WinStatus player_win_kind() const;
 
     virtual Move make_move(const Board& board, const Pentago& game) = 0;
 
@@ -29,5 +30,14 @@ private:
 };
 
 
+inline WinStatus PlayerController::player_win_kind() const
+{
+    if(m_color == BlackPlayer) {
+       return BlackWin;
+    } else {
+       return WhiteWin;
+    } 
+}
+ 
 #endif
     
