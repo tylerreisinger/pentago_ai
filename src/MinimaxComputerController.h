@@ -14,7 +14,7 @@ class MinimaxComputerController: public PlayerController
 {
 public:
     MinimaxComputerController(std::string name, PlayerColor color, 
-            const Board& board, int start_depth, float max_turn_time);
+            const Board& board, int max_depth, float max_turn_time);
     ~MinimaxComputerController();
 
     virtual Move make_move(const Board& board, const Pentago& game);
@@ -52,7 +52,8 @@ private:
 
     float m_coeff_center_control;
     float m_coeff_longest_run;
-    int m_start_depth;
+
+    int m_max_depth;
     float m_max_turn_time;
 
     int m_node_evals;

@@ -17,8 +17,8 @@ int diag_scan(const Board& board, int x, int y, BoardEntry entry);
 int diag_scan_neg(const Board& board, int x, int y, BoardEntry entry);
 
 MinimaxComputerController::MinimaxComputerController(std::string name, PlayerColor color,
-        const Board& board, int start_depth, float max_turn_time):
-    PlayerController(name, color), m_start_depth(start_depth),
+        const Board& board, int max_depth, float max_turn_time):
+    PlayerController(name, color), m_max_depth(max_depth),
     m_max_turn_time(max_turn_time)
 {
 
@@ -54,7 +54,7 @@ Move MinimaxComputerController::make_move(const Board& board, const Pentago& gam
     //Apply iterative deepening. This not only allows the highest depth for the
     //time constrait to be chosen, but guarentees that the quickest win will be
     //selected.
-    while(elapsed_time <= m_max_turn_time*CLOCKS_PER_SEC && depth < 4) {
+    while(elapsed_time <= m_max_turn_time*CLOCKS_PER_SEC && depth < m_max_depth) {
         m_killer_moves.resize(depth+1, Move::invalid_move());
         Move new_move = minimax_2(board, depth, max);
         if(!m_time_cancel) {
@@ -65,12 +65,10 @@ Move MinimaxComputerController::make_move(const Board& board, const Pentago& gam
             break;
         }
         
-        //Check if we have a winning move. We should't need to go deeper if we do.
+        //Check if we have a winning move. We should't go deeper if we do.
         Board board_copy = board.clone();
-
         WinStatus early_win = board_copy.apply_move(new_move, color());
         WinStatus late_win = board_copy.check_for_wins();
-
         if(early_win == player_win_kind() || late_win == player_win_kind()) {
             break;
         }

@@ -6,6 +6,7 @@
 #include <stdexcept>
 
 #include "HumanPlayerController.h"
+#include "ControllerFactory.h"
 
 Pentago::Pentago(Board board, PlayerController* player1, PlayerController* player2):
     m_board(board), m_current_player(player1), m_next_player(player2)
@@ -73,6 +74,8 @@ void Pentago::serialize_state(std::ostream& stream)
     stream << m_next_player->name() << "\n";
     stream << color_to_serial_str(m_current_player->color()) << "\n"; 
     stream << color_to_serial_str(m_next_player->color()) << "\n"; 
+    stream << m_current_player->kind_id() << "\n";
+    stream << m_next_player->kind_id() << "\n";
 
     //We always serialize the next player to make a move first.
     stream << "1\n";
@@ -101,13 +104,16 @@ PlayerColor char_to_color(char ch) {
     }
 }
  
-Pentago* Pentago::load_game(std::istream& in_stream)
+Pentago* Pentago::load_game(std::istream& in_stream, const ControllerFactory& factory)
 {
     std::string player1_name;
     std::string player2_name;
 
     char player1_color;
     char player2_color;
+
+    int player1_controller_id;
+    int player2_controller_id;
 
     //Load the player information
     if(!(in_stream >> player1_name)) {
@@ -122,26 +128,23 @@ Pentago* Pentago::load_game(std::istream& in_stream)
     if(!(in_stream >> player2_color)) {
         return NULL;
     }
-
-    //Create our controllers. In the future this will have to change to accomodate computer players.
-    PlayerController* player1 = new HumanPlayerController(player1_name, char_to_color(player1_color));
-    PlayerController* player2 = new HumanPlayerController(player2_name, char_to_color(player2_color));
-
-    int next_player;
-    if(!(in_stream >> next_player)) {
+    if(!(in_stream >> player1_controller_id)) {
+        return NULL;
+    }
+    if(!(in_stream >> player2_controller_id)) {
         return NULL;
     }
 
-    //If the second listed player is first, swap the pointers
-    if(next_player != 1) {
-        std::swap(player1, player2);
+    //Get the index of the next player to make a move.
+    int next_player;
+    if(!(in_stream >> next_player)) {
+        return NULL;
     }
 
     //Ignore all characters up to the new line so getline starts with the board data.
     in_stream.ignore(1000, '\n');
 
     Board board;
-
     //Read in the board state
     for(int i = 0; i < board.board_size(); ++i) {
         std::string line;
@@ -152,6 +155,19 @@ Pentago* Pentago::load_game(std::istream& in_stream)
         for(int j = 0; j < board.board_size(); ++j) {
             board.set_value_absolute(j, i, board_entry_from_char(line[j]));    
         }
+    }
+
+    //Create our controllers. In the future this will have to change to accomodate computer players.
+    
+    PlayerController* player1 = factory.construct(player1_controller_id, player1_name,
+            char_to_color(player1_color), board);
+    PlayerController* player2 = factory.construct(player2_controller_id, player2_name,
+            char_to_color(player2_color), board);
+
+
+    //If the second listed player is first, swap the pointers
+    if(next_player != 1) {
+        std::swap(player1, player2);
     }
 
     Pentago* game = new Pentago(board, player1, player2);

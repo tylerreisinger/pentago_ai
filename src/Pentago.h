@@ -10,6 +10,8 @@
 #include "PlayerController.h"
 #include "Enums.h"
 
+class ControllerFactory;
+
 class Pentago
 {
 public:
@@ -26,7 +28,7 @@ public:
 
     void swap_payers();
 
-    static Pentago* load_game(std::istream& in_stream);
+    static Pentago* load_game(std::istream& in_stream, const ControllerFactory& factory);
 
     PlayerController* get_current_player() {return m_current_player;}
     PlayerController* get_next_player() {return m_next_player;}

@@ -5,6 +5,7 @@
 #include <cassert>
 #include <ctime>
 #include <cstdlib>
+#include <memory>
 
 #include "Board.h"
 #include "HumanPlayerController.h"
@@ -13,65 +14,9 @@
 #include "MctsComputerController.h" 
 #include "Enums.h"
 #include "Pentago.h"
+#include "ControllerFactory.h"
 
 static const char save_file_path[] = "game_state.txt";
-
-enum ControllerType {
-    ControllerTypePlayer,
-    ControllerTypeComputerRandom,
-    ControllerTypeComputerMinimax,
-    ControllerTypeComputerMcts,
-};
-
-ControllerType prompt_player_controller_type(const std::string& player_name) {
-    const int CHOICE_PLAYER = 1;
-    const int CHOICE_RANDOM_COMPUTER = 2;
-    const int CHOICE_MINIMAX_COMPUTER = 3;
-    const int CHOICE_MCTS_COMPUTER = 4;
-
-    const int max_choice = 4;
-    int choice = -1;
-    while(true) {
-        std::cout << "How is " << player_name << " controlled?\n";
-        std::cout << "1) Player Controlled\n";
-        std::cout << "2) Computer (Random) Controlled" << std::endl;
-        std::cout << "3) Computer (Minimax) Controlled" << std::endl;
-        std::cout << "4) Computer (Mcts) Controlled" << std::endl;
-
-        std::cin >> choice;
-        if(choice < 1 || choice > max_choice) {
-            std::cout << "That is not a valid choice" << std::endl;
-            std::cin.clear();
-            std::cin.ignore(1000, '\n');
-        } else {
-            break;
-        }
-
-    }
-
-    switch(choice) {
-        case CHOICE_PLAYER: return ControllerTypePlayer;
-        case CHOICE_RANDOM_COMPUTER: return ControllerTypeComputerRandom;
-        case CHOICE_MINIMAX_COMPUTER: return ControllerTypeComputerMinimax;
-        case CHOICE_MCTS_COMPUTER: return ControllerTypeComputerMcts;
-        default: throw std::runtime_error("Invalid ControllerType");
-    }
-}
-
-PlayerController* construct_controller(ControllerType type, std::string name, 
-        PlayerColor color, const Board& initial_board) {
-    switch(type) {
-        case ControllerTypePlayer: 
-            return new HumanPlayerController(name, color);
-        case ControllerTypeComputerRandom: 
-            return new RandomComputerController(name, color);
-        case ControllerTypeComputerMinimax: 
-            return new MinimaxComputerController(name, color, initial_board, 2, 15.00);
-        case ControllerTypeComputerMcts: 
-            return new MctsComputerController(name, color, initial_board);
-        default: throw std::runtime_error("Invalid ControllerType");
-    }
-}
 
 PlayerColor prompt_player_color(const std::string& player_name) {
     std::string color_string;
@@ -95,7 +40,8 @@ PlayerColor prompt_player_color(const std::string& player_name) {
     }
 }
 
-PlayerController* prepare_player(bool ask_color, const std::string& player_ordinal,
+PlayerController* prepare_player(const ControllerFactory& factory, bool ask_color, 
+       const std::string& player_ordinal,
        const Board& initial_board, PlayerColor color = WhitePlayer) {
     std::string player_name;
     PlayerColor player_color;
@@ -110,31 +56,55 @@ PlayerController* prepare_player(bool ask_color, const std::string& player_ordin
     }
 
 
-    PlayerController* player = construct_controller(prompt_player_controller_type(player_name),
-            player_name, player_color, initial_board);
+    PlayerController* player = factory.prompt_user_controller_selection(player_name,
+            player_color, initial_board);
 
     return player;
 }
 
-Pentago* start_new_game() {
+std::unique_ptr<ControllerFactory> initialize_controller_factory() {
+    auto factory = std::unique_ptr<ControllerFactory>(new ControllerFactory());
+    
+    factory->register_constructor("Player Controlled", 
+        [](std::string name, PlayerColor color, const Board& initial_board) -> PlayerController* {
+            return new HumanPlayerController(std::move(name), color);
+        });
+
+    factory->register_constructor("Computer (Random) Controlled", 
+        [](std::string name, PlayerColor color, const Board& initial_board) -> PlayerController* {
+            return new RandomComputerController(std::move(name), color);
+        });
+
+    factory->register_constructor("Computer (Minimax) Controlled", 
+        [](std::string name, PlayerColor color, const Board& initial_board) -> PlayerController* {
+            return new MinimaxComputerController(std::move(name), color, initial_board,
+                4, 15.00);
+        });
+
+    return factory;
+}
+
+Pentago* start_new_game(const ControllerFactory& factory) {
     Board board;
     
-    PlayerController* player1 = prepare_player(true, "first", board);
-    PlayerController* player2 = prepare_player(false, "second", board,
+    PlayerController* player1 = prepare_player(factory, true, "first", board);
+    PlayerController* player2 = prepare_player(factory, false, "second", board,
             opposing_color(player1->color()));
 
     Pentago* game = new Pentago(board, player1, player2);
     return game;
 }
 
-Pentago* load_game(std::istream& stream) {
-    Pentago* game = Pentago::load_game(stream);
+Pentago* load_game(std::istream& stream, const ControllerFactory& factory) {
+    Pentago* game = Pentago::load_game(stream, factory);
     return game;
 }
 
 int main(int argc, char** argv) {
 
     std::srand(std::time(NULL));
+
+    auto controller_factory = initialize_controller_factory();
 
     std::cout << "Welcome to Pentago!" << std::endl;
 
@@ -144,7 +114,7 @@ int main(int argc, char** argv) {
 
     //Only present the menu if the save file exists, otherwise start a new game automatically.
     if(!save_stream.good()) {
-        game = start_new_game();
+        game = start_new_game(*controller_factory);
     }
     while(save_stream.good()) {
         std::cout << "Do you want to 1) Start a new game or 2) Continue the previous game? ";
@@ -152,10 +122,10 @@ int main(int argc, char** argv) {
         std::cin >> option;
         std::cout << std::endl;
         if(option == 1) {
-            game = start_new_game();
+            game = start_new_game(*controller_factory);
             break;
         } else if(option == 2) {
-            game = load_game(save_stream);
+            game = load_game(save_stream, *controller_factory);
             if(game == NULL) {
                 std::cerr << "Couldn't load the save file!";
                 return -1;
