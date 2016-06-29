@@ -45,6 +45,9 @@ private:
     Move minimax_min_value(const Board& board, int depth_bound, float alpha, float beta, 
             float& value);
 
+    void add_killer(int depth_bound, Move move);
+    int copy_killers_to_move_list(int depth_bound, const Board& board);
+
     std::vector<Move> m_potential_moves;
     std::vector<Move> m_move_loc_list;
 

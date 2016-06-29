@@ -8,7 +8,7 @@
 
 static const float POS_INF = 1e10;
 static const float NEG_INF = -1e10;
-static const int KILLER_COUNT = 1;
+static const int KILLER_COUNT = 4;
 
 bool scan_compare(BoardEntry entry, BoardEntry scan_entry, int& run_len);
 int horiz_scan(const Board& board, int x, int y, BoardEntry entry);
@@ -55,7 +55,7 @@ Move MinimaxComputerController::make_move(const Board& board, const Pentago& gam
     //time constrait to be chosen, but guarentees that the quickest win will be
     //selected.
     while(elapsed_time <= m_max_turn_time*CLOCKS_PER_SEC && depth < m_max_depth) {
-        m_killer_moves.resize(depth+1, Move::invalid_move());
+        m_killer_moves.resize(KILLER_COUNT*(depth+1), Move::invalid_move());
         Move new_move = minimax_2(board, depth, max);
         if(!m_time_cancel) {
             move = new_move;
@@ -116,8 +116,10 @@ void MinimaxComputerController::build_static_move_list(const Board& board)
     m_potential_moves.clear();
     m_potential_moves.reserve(move_count*board.cell_count()*2+KILLER_COUNT);
 
-    //Killer move slot
-    m_potential_moves.push_back(Move::invalid_move());
+    //Killer move slots
+    for(int i = 0; i < KILLER_COUNT; ++i) {
+        m_potential_moves.push_back(Move::invalid_move());
+    }
 
     //Build the actual moves from the locations
     for(int i = 0; i < move_count; ++i) {
@@ -396,17 +398,9 @@ Move MinimaxComputerController::minimax_max_value(const Board& board, int depth_
 
     value = NEG_INF*10;
     Move move = Move::invalid_move();
+
+    int i = copy_killers_to_move_list(depth_bound, board);
     
-    int i = 0;
-
-    if(!m_killer_moves[depth_bound].is_invalid() && 
-            board.is_cell_empty(m_killer_moves[depth_bound].play_cell(),
-            m_killer_moves[depth_bound].play_index())) {
-        m_potential_moves[0] = m_killer_moves[depth_bound];
-    } else {
-        i = 1;
-    }
-
     for(; i < m_potential_moves.size(); ++i) {
         Move player_move = m_potential_moves[i];
         if(!board.is_cell_empty(player_move.play_cell(), player_move.play_index())) {
@@ -424,6 +418,7 @@ Move MinimaxComputerController::minimax_max_value(const Board& board, int depth_
                     alpha, beta, inner_value);
         } else {
             inner_value = score_board(new_state);
+            m_node_evals += 1;
         }
 
         if (inner_value > value) {
@@ -438,7 +433,7 @@ Move MinimaxComputerController::minimax_max_value(const Board& board, int depth_
         }
 
         if(value > beta) {
-            m_killer_moves[depth_bound] = player_move;
+            add_killer(depth_bound, player_move);
             return move;
         }
 
@@ -467,15 +462,7 @@ Move MinimaxComputerController::minimax_min_value(const Board& board, int depth_
     value = POS_INF*10;
     Move move = Move::invalid_move();
 
-    int i = 0;
-
-    if(!m_killer_moves[depth_bound].is_invalid() && 
-            board.is_cell_empty(m_killer_moves[depth_bound].play_cell(),
-            m_killer_moves[depth_bound].play_index())) {
-        m_potential_moves[0] = m_killer_moves[depth_bound];
-    } else {
-        i = 1;
-    }
+    int i = copy_killers_to_move_list(depth_bound, board);
 
     for(; i < m_potential_moves.size(); ++i) {
         Move player_move = m_potential_moves[i];
@@ -493,6 +480,7 @@ Move MinimaxComputerController::minimax_min_value(const Board& board, int depth_
             minimax_max_value(new_state, depth_bound-1, alpha, beta, inner_value);
         } else {
             inner_value = score_board(new_state);
+            m_node_evals += 1;
         }
 
         if(inner_value < value) {
@@ -507,7 +495,7 @@ Move MinimaxComputerController::minimax_min_value(const Board& board, int depth_
         }
 
         if(value < alpha) {
-            m_killer_moves[depth_bound] = player_move;
+            add_killer(depth_bound, player_move);
             return move;
         }
 
@@ -516,4 +504,37 @@ Move MinimaxComputerController::minimax_min_value(const Board& board, int depth_
 
     return move;
 }
+
+void MinimaxComputerController::add_killer(int depth_bound, Move move)
+{
+    int killer_start_idx = depth_bound*KILLER_COUNT;
+
+    for(int j = 0; j < KILLER_COUNT; ++j) {
+        if(m_killer_moves[killer_start_idx+j] == move) {
+          return; 
+        }
+    }
+
+    for(int j = 1; j < KILLER_COUNT; ++j) {
+        m_killer_moves[killer_start_idx+j-1] = m_killer_moves[killer_start_idx+j];
+    }
+
+    m_killer_moves[killer_start_idx+KILLER_COUNT-1] = move;
+}
  
+int MinimaxComputerController::copy_killers_to_move_list(int depth_bound, const Board& board)
+{
+    int first_move = 0;
+    for(int j = 0; j < KILLER_COUNT; ++j) {
+        Move killer_move = m_killer_moves[depth_bound*KILLER_COUNT+j];
+        if(!killer_move.is_invalid() && 
+                board.is_cell_empty(killer_move.play_cell(),
+                killer_move.play_index())) {
+            m_potential_moves[j] = killer_move;
+        } else {
+            first_move = j+1;
+        }
+    }
+
+    return first_move;
+}
